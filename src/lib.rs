@@ -161,6 +161,7 @@ fn bnb(
         + options.cost_per_output;
     let match_range = options.cost_per_input + options.cost_per_output;
     if acc_eff_value > target_for_match + match_range {
+        None
     } else if acc_eff_value >= target_for_match {
         return Some(selected_inputs.to_vec());
     } else if bnp_tries == 0 || depth >= inputs_in_desc_value.len() {
