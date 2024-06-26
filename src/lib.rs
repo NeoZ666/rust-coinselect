@@ -105,7 +105,7 @@ pub fn select_coin_bnb(
     let mut sorted_inputs: Vec<(usize, OutputGroup)> = inputs
         .iter()
         .enumerate()
-        .map(|(index, input)| (index, input.clone()))
+        .map(|(index, input)| (index, *input))
         .collect();
     sorted_inputs.sort_by_key(|(_, input)| std::cmp::Reverse(input.value));
 
