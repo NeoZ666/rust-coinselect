@@ -105,7 +105,7 @@ pub fn select_coin_bnb(
     let mut sorted_inputs: Vec<(usize, OutputGroup)> = inputs
         .iter()
         .enumerate()
-        .map(|(index, input)| (index, input.clone()))
+        .map(|(index, input)| (index, *input))
         .collect();
     sorted_inputs.sort_by_key(|(_, input)| std::cmp::Reverse(input.value));
 
@@ -161,77 +161,75 @@ fn bnb(
         + options.cost_per_output;
     let match_range = options.cost_per_input + options.cost_per_output;
     if acc_eff_value > target_for_match + match_range {
-        return None;
+        None
     } else if acc_eff_value >= target_for_match {
         return Some(selected_inputs.to_vec());
-    } else if bnp_tries <= 0 || depth >= inputs_in_desc_value.len() {
+    } else if bnp_tries == 0 || depth >= inputs_in_desc_value.len() {
         return None;
-    } else {
-        if rng.gen_bool(0.5) {
-            // exploring the inclusion branch
-            // first include then omit
-            let new_effective_values = acc_eff_value
-                + effective_value(&inputs_in_desc_value[depth].1, options.target_feerate);
-            selected_inputs.push(inputs_in_desc_value[depth].0);
-            let with_this = bnb(
-                inputs_in_desc_value,
-                selected_inputs,
-                new_effective_values,
-                depth + 1,
-                bnp_tries - 1,
-                options,
-                rng,
-            );
-            match with_this {
-                Some(_) => return with_this,
-                None => {
-                    selected_inputs.pop(); //poping out the selected utxo if it does not fit
-                    let without_this = bnb(
-                        inputs_in_desc_value,
-                        selected_inputs,
-                        acc_eff_value,
-                        depth + 1,
-                        bnp_tries - 1,
-                        options,
-                        rng,
-                    );
-                    match without_this {
-                        Some(_) => return without_this,
-                        None => return None, // this may or may not be correct
-                    }
+    } else if rng.gen_bool(0.5) {
+        // exploring the inclusion branch
+        // first include then omit
+        let new_effective_values =
+            acc_eff_value + effective_value(&inputs_in_desc_value[depth].1, options.target_feerate);
+        selected_inputs.push(inputs_in_desc_value[depth].0);
+        let with_this = bnb(
+            inputs_in_desc_value,
+            selected_inputs,
+            new_effective_values,
+            depth + 1,
+            bnp_tries - 1,
+            options,
+            rng,
+        );
+        match with_this {
+            Some(_) => return with_this,
+            None => {
+                selected_inputs.pop(); //poping out the selected utxo if it does not fit
+                let without_this = bnb(
+                    inputs_in_desc_value,
+                    selected_inputs,
+                    acc_eff_value,
+                    depth + 1,
+                    bnp_tries - 1,
+                    options,
+                    rng,
+                );
+                match without_this {
+                    Some(_) => return without_this,
+                    None => return None, // this may or may not be correct
                 }
             }
-        } else {
-            let without_this = bnb(
-                inputs_in_desc_value,
-                selected_inputs,
-                acc_eff_value,
-                depth + 1,
-                bnp_tries - 1,
-                options,
-                rng,
-            );
-            match without_this {
-                Some(_) => return without_this,
-                None => {
-                    let new_effective_values = acc_eff_value
-                        + effective_value(&inputs_in_desc_value[depth].1, options.target_feerate);
-                    selected_inputs.push(inputs_in_desc_value[depth].0);
-                    let with_this = bnb(
-                        inputs_in_desc_value,
-                        selected_inputs,
-                        new_effective_values,
-                        depth + 1,
-                        bnp_tries - 1,
-                        options,
-                        rng,
-                    );
-                    match with_this {
-                        Some(_) => return with_this,
-                        None => {
-                            selected_inputs.pop(); // poping out the selected utxo if it does not fit
-                            return None; // this may or may not be correct
-                        }
+        }
+    } else {
+        let without_this = bnb(
+            inputs_in_desc_value,
+            selected_inputs,
+            acc_eff_value,
+            depth + 1,
+            bnp_tries - 1,
+            options,
+            rng,
+        );
+        match without_this {
+            Some(_) => return without_this,
+            None => {
+                let new_effective_values = acc_eff_value
+                    + effective_value(&inputs_in_desc_value[depth].1, options.target_feerate);
+                selected_inputs.push(inputs_in_desc_value[depth].0);
+                let with_this = bnb(
+                    inputs_in_desc_value,
+                    selected_inputs,
+                    new_effective_values,
+                    depth + 1,
+                    bnp_tries - 1,
+                    options,
+                    rng,
+                );
+                match with_this {
+                    Some(_) => return with_this,
+                    None => {
+                        selected_inputs.pop(); // poping out the selected utxo if it does not fit
+                        return None; // this may or may not be correct
                     }
                 }
             }
