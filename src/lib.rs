@@ -162,13 +162,13 @@ fn bnb(
     let match_range = options.cost_per_input + options.cost_per_output;
     if acc_eff_value > target_for_match + match_range {
         return None;
-    } 
+    }
     if acc_eff_value >= target_for_match {
         return Some(selected_inputs.to_vec());
-    } 
+    }
     if bnp_tries == 0 || depth >= inputs_in_desc_value.len() {
         return None;
-    } 
+    }
     if rng.gen_bool(0.5) {
         // exploring the inclusion branch
         // first include then omit
@@ -198,8 +198,8 @@ fn bnb(
                     rng,
                 );
                 match without_this {
-                    Some(_) => return without_this,
-                    None => return None, // this may or may not be correct
+                    Some(_) => without_this,
+                    None => None, // this may or may not be correct
                 }
             }
         }
@@ -214,7 +214,7 @@ fn bnb(
             rng,
         );
         match without_this {
-            Some(_) => return without_this,
+            Some(_) => without_this,
             None => {
                 let new_effective_values = acc_eff_value
                     + effective_value(&inputs_in_desc_value[depth].1, options.target_feerate);
@@ -229,10 +229,10 @@ fn bnb(
                     rng,
                 );
                 match with_this {
-                    Some(_) => return with_this,
+                    Some(_) => with_this,
                     None => {
                         selected_inputs.pop(); // poping out the selected utxo if it does not fit
-                        return None; // this may or may not be correct
+                        None // this may or may not be correct
                     }
                 }
             }
