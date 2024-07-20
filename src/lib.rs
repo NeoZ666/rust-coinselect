@@ -2,7 +2,7 @@
 
 //! A blockchain-agnostic Rust Coinselection library
 
-use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
+use rand::{rngs::ThreadRng, seq::SliceRandom, thread_rng, Rng};
 use std::{option, vec};
 
 /// A [`OutputGroup`] represents an input candidate for Coinselection. This can either be a
@@ -100,7 +100,7 @@ pub fn select_coin_bnb(
     rng: &mut ThreadRng,
 ) -> Result<SelectionOutput, SelectionError> {
     let mut selected_inputs: Vec<usize> = vec![];
-    let bnb_tries = 1000000;
+    const BNB_TRIES: u32 = 1000000;
 
     let mut sorted_inputs: Vec<(usize, OutputGroup)> = inputs
         .iter()
@@ -114,7 +114,7 @@ pub fn select_coin_bnb(
         &mut selected_inputs,
         0,
         0,
-        bnb_tries,
+        BNB_TRIES,
         &options,
         rng,
     );
@@ -141,7 +141,7 @@ pub fn select_coin_bnb(
             };
             Ok(selection_output)
         }
-        None => select_coin_srd(inputs, options, &mut rand::thread_rng()),
+        None => Err(SelectionError::NoSolutionFound),
     }
 }
 
@@ -161,12 +161,15 @@ fn bnb(
         + options.cost_per_output;
     let match_range = options.cost_per_input + options.cost_per_output;
     if acc_eff_value > target_for_match + match_range {
-        None
-    } else if acc_eff_value >= target_for_match {
-        return Some(selected_inputs.to_vec());
-    } else if bnp_tries == 0 || depth >= inputs_in_desc_value.len() {
         return None;
-    } else if rng.gen_bool(0.5) {
+    } 
+    if acc_eff_value >= target_for_match {
+        return Some(selected_inputs.to_vec());
+    } 
+    if bnp_tries == 0 || depth >= inputs_in_desc_value.len() {
+        return None;
+    } 
+    if rng.gen_bool(0.5) {
         // exploring the inclusion branch
         // first include then omit
         let new_effective_values =
@@ -182,7 +185,7 @@ fn bnb(
             rng,
         );
         match with_this {
-            Some(_) => return with_this,
+            Some(_) => with_this,
             None => {
                 selected_inputs.pop(); //poping out the selected utxo if it does not fit
                 let without_this = bnb(
@@ -190,7 +193,7 @@ fn bnb(
                     selected_inputs,
                     acc_eff_value,
                     depth + 1,
-                    bnp_tries - 1,
+                    bnp_tries - 2,
                     options,
                     rng,
                 );
@@ -221,7 +224,7 @@ fn bnb(
                     selected_inputs,
                     new_effective_values,
                     depth + 1,
-                    bnp_tries - 1,
+                    bnp_tries - 2,
                     options,
                     rng,
                 );
@@ -373,15 +376,16 @@ pub fn select_coin_fifo(
 pub fn select_coin_srd(
     inputs: &[OutputGroup],
     options: CoinSelectionOpt,
-    rng: &mut ThreadRng,
 ) -> Result<SelectionOutput, SelectionError> {
     // Randomize the inputs order to simulate the random draw
+    let mut rng = thread_rng();
     // In out put we need to specify the indexes of the inputs in the given order
     // So keep track of the indexes when randomiz ing the vec
     let mut randomized_inputs: Vec<_> = inputs.iter().enumerate().collect();
 
     // Randomize the inputs order to simulate the random draw
-    randomized_inputs.shuffle(rng);
+    let mut rng = thread_rng();
+    randomized_inputs.shuffle(&mut rng);
 
     let mut accumulated_value = 0;
     let mut selected_inputs = Vec::new();
@@ -479,11 +483,6 @@ fn effective_value(output: &OutputGroup, feerate: f32) -> u64 {
     output
         .value
         .saturating_sub(calculate_fee(output.weight, feerate))
-}
-
-fn generate_random_bool(rng: &mut ThreadRng) -> bool {
-    // Generate a random boolean value
-    rng.gen()
 }
 
 #[cfg(test)]
@@ -768,7 +767,7 @@ mod test {
     fn test_successful_selection() {
         let mut inputs = setup_basic_output_groups();
         let mut options = setup_options(2500);
-        let mut result = select_coin_srd(&inputs, options, &mut rand::thread_rng());
+        let mut result = select_coin_srd(&inputs, options);
         assert!(result.is_ok());
         let mut selection_output = result.unwrap();
         assert!(!selection_output.selected_inputs.is_empty());
@@ -784,7 +783,7 @@ mod test {
     fn test_insufficient_funds() {
         let inputs = setup_basic_output_groups();
         let options = setup_options(7000); // Set a target value higher than the sum of all inputs
-        let result = select_coin_srd(&inputs, options, &mut rand::thread_rng());
+        let result = select_coin_srd(&inputs, options);
         assert!(matches!(result, Err(SelectionError::InsufficientFunds)));
     }
     #[test]
