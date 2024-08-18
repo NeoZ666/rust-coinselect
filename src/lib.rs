@@ -2,6 +2,7 @@
 
 //! A blockchain-agnostic Rust Coinselection library
 
+
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use std::cmp::Reverse;
 use std::collections::HashSet;
@@ -116,6 +117,7 @@ pub fn select_coin_bnb(
     rng: &mut ThreadRng,
 ) -> Result<SelectionOutput, SelectionError> {
     let mut selected_inputs: Vec<usize> = vec![];
+
     const BNB_TRIES: u32 = 1_000_000;
 
     let match_parameters = MatchParameters {
@@ -552,7 +554,6 @@ pub fn select_coin_srd(
         waste: WasteMetric(waste),
     })
 }
-
 /// The Global Coinselection API that performs all the algorithms and proudeces result with least [WasteMetric].
 /// At least one selection solution should be found.
 type CoinSelectionFn =
@@ -659,6 +660,11 @@ fn effective_value(output: &OutputGroup, feerate: f32) -> u64 {
     output
         .value
         .saturating_sub(calculate_fee(output.weight, feerate))
+}
+
+fn generate_random_bool(rng: &mut ThreadRng) -> bool {
+    // Generate a random boolean value
+    rng.gen()
 }
 
 #[cfg(test)]
