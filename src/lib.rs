@@ -99,6 +99,16 @@ pub struct SelectionOutput {
     pub waste: WasteMetric,
 }
 
+/// Wrapped in a struct or else input for fn bnb takes too many arguments - 9/7, 
+/// Leading to usage of stack instead of registers - https://users.rust-lang.org/t/avoiding-too-many-arguments-passing-to-a-function/103581
+/// Fit in : 1 XMM register, 1 GPR
+#[derive(Debug)]
+pub struct MatchParameters {
+    target_for_match: u64,
+    match_range: u64,
+    target_feerate: f32,
+}
+
 /// Perform Coinselection via Branch And Bound algorithm.
 pub fn select_coin_bnb(
     inputs: &[OutputGroup],
@@ -107,6 +117,12 @@ pub fn select_coin_bnb(
 ) -> Result<SelectionOutput, SelectionError> {
     let mut selected_inputs: Vec<usize> = vec![];
     const BNB_TRIES: u32 = 1_000_000;
+
+    let match_parameters = MatchParameters {
+        target_for_match: options.target_value + calculate_fee(options.base_weight, options.target_feerate) + options.cost_per_output,
+        match_range: options.cost_per_input + options.cost_per_output,
+        target_feerate: options.target_feerate,
+    };
 
     let mut sorted_inputs: Vec<(usize, OutputGroup)> = inputs
         .iter()
@@ -121,8 +137,8 @@ pub fn select_coin_bnb(
         0,
         0,
         BNB_TRIES,
-        &options,
         rng,
+        &match_parameters,
     );
     match bnb_selected_coin {
         Some(selected_coin) => {
@@ -159,17 +175,13 @@ fn bnb(
     acc_eff_value: u64,
     depth: usize,
     bnp_tries: u32,
-    options: &CoinSelectionOpt,
     rng: &mut ThreadRng,
+    match_parameters: &MatchParameters, 
 ) -> Option<Vec<usize>> {
-    let target_for_match = options.target_value
-        + calculate_fee(options.base_weight, options.target_feerate)
-        + options.cost_per_output;
-    let match_range = options.cost_per_input + options.cost_per_output;
-    if acc_eff_value > target_for_match + match_range {
+    if acc_eff_value > match_parameters.target_for_match + match_parameters.match_range {
         return None;
     }
-    if acc_eff_value >= target_for_match {
+    if acc_eff_value >= match_parameters.target_for_match {
         return Some(selected_inputs.to_vec());
     }
     if bnp_tries == 0 || depth >= inputs_in_desc_value.len() {
@@ -178,17 +190,17 @@ fn bnb(
     if rng.gen_bool(0.5) {
         // exploring the inclusion branch
         // first include then omit
-        let new_effective_values =
-            acc_eff_value + effective_value(&inputs_in_desc_value[depth].1, options.target_feerate);
+        let new_effective_value =
+            acc_eff_value + effective_value(&inputs_in_desc_value[depth].1, match_parameters.target_feerate);
         selected_inputs.push(inputs_in_desc_value[depth].0);
         let with_this = bnb(
             inputs_in_desc_value,
             selected_inputs,
-            new_effective_values,
+            new_effective_value,
             depth + 1,
             bnp_tries - 1,
-            options,
             rng,
+            match_parameters,
         );
         match with_this {
             Some(_) => with_this,
@@ -200,8 +212,8 @@ fn bnb(
                     acc_eff_value,
                     depth + 1,
                     bnp_tries - 2,
-                    options,
                     rng,
+                    match_parameters,
                 );
                 match without_this {
                     Some(_) => without_this,
@@ -216,23 +228,23 @@ fn bnb(
             acc_eff_value,
             depth + 1,
             bnp_tries - 2,
-            options,
             rng,
+            match_parameters,
         );
         match without_this {
             Some(_) => without_this,
             None => {
-                let new_effective_values = acc_eff_value
-                    + effective_value(&inputs_in_desc_value[depth].1, options.target_feerate);
+                let new_effective_value = acc_eff_value
+                    + effective_value(&inputs_in_desc_value[depth].1, match_parameters.target_feerate);
                 selected_inputs.push(inputs_in_desc_value[depth].0);
                 let with_this = bnb(
                     inputs_in_desc_value,
                     selected_inputs,
-                    new_effective_values,
+                    new_effective_value,
                     depth + 1,
                     bnp_tries - 2,
-                    options,
                     rng,
+                    match_parameters,
                 );
                 match with_this {
                     Some(_) => with_this,
