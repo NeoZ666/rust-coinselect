@@ -98,7 +98,6 @@ pub struct SelectionOutput {
     /// The waste amount, for the above inputs.
     pub waste: WasteMetric,
 }
-
 /// Struct for three arguments : target_for_match, match_range and target_feerate
 ///
 /// Wrapped in a struct or else input for fn bnb takes too many arguments - 9/7
@@ -599,6 +598,7 @@ pub fn select_coin(
     options: CoinSelectionOpt,
 ) -> Result<SelectionOutput, SelectionError> {
     let algorithms: Vec<CoinSelectionFn> = vec![
+        select_coin_bnb,
         select_coin_fifo,
         select_coin_lowestlarger,
         select_coin_srd,
