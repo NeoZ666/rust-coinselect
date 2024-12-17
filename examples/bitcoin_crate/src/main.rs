@@ -94,22 +94,24 @@ fn create_transaction(txinput: Vec<TxIn>, txoutput: Vec<TxOut>) -> Transaction {
 
 fn get_weight(tx: &Transaction, txinput: Vec<TxIn>) -> Vec<Weight> {
     let mut predicted_weights: Vec<Weight> = vec![];
-
+    
     for input in txinput {
         let script_len = input.script_sig.len();
+        
+        let witness_lens: Vec<usize> = input.witness.iter()
+            .map(|elem| elem.len())
+            .collect();
 
-        let witness_lens: Vec<usize> = input.witness.iter().map(|elem| elem.len()).collect();
-
-        let input_weight_prediction = InputWeightPrediction::new(script_len, witness_lens.clone());
+            let input_weight_prediction = InputWeightPrediction::new(
+            script_len,
+            witness_lens.clone() 
+        );
 
         predicted_weights.push(predict_weight(
-            Some(input_weight_prediction),
+            Some(input_weight_prediction),  
             tx.script_pubkey_lens(),
         ));
-        println!(
-            "Script length {:?} and Witness Element length {:?}",
-            script_len, witness_lens
-        );
+        println!("Script length {:?} and Witness Element length {:?}", script_len, witness_lens);
     }
 
     predicted_weights
