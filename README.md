@@ -1,3 +1,5 @@
+This repository has now been archived and development has moved [here](https://github.com/citadel-tech/rust-coinselect)
+
 # rust-coinselect
 
 A blockchain-agnostic coin selection library built in Rust.
